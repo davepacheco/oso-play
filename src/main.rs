@@ -28,9 +28,9 @@ struct Document {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut oso = Oso::new();
 
-    oso.register_class(User::get_polar_class_builder().build())?;
-    oso.register_class(Folder::get_polar_class_builder().build())?;
-    oso.register_class(Document::get_polar_class_builder().build())?;
+    oso.register_class(User::get_polar_class())?;
+    oso.register_class(Folder::get_polar_class())?;
+    oso.register_class(Document::get_polar_class())?;
 
     oso.load_str(
         r#"
