@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 oso = "0.22"
+
+[patch.crates-io]
+oso = { path = "../oso-local/languages/rust/oso" }
