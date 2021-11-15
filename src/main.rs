@@ -1,39 +1,80 @@
-// Copied from the docs
 use oso::{Oso, PolarClass};
 
-#[derive(Clone, PolarClass)]
+#[derive(Clone, Copy, PolarClass)]
 struct User {
     #[polar(attribute)]
-    pub username: String,
+    pub username: &'static str,
 }
 
-impl User {
-    fn superuser() -> Vec<String> {
-        return vec!["alice".to_string(), "charlie".to_string()];
+#[derive(Clone, Copy)]
+struct Folder {
+    pub name: &'static str,
+}
+
+impl oso::PolarClass for Folder {
+    fn get_polar_class() -> oso::Class {
+        Self::get_polar_class_builder()
+            .set_equality_check(|f1, f2| f1.name == f2.name)
+            .build()
     }
+}
+
+#[derive(Clone, Copy, PolarClass)]
+struct Document {
+    #[polar(attribute)]
+    folder: Folder,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut oso = Oso::new();
 
-    oso.register_class(
-        User::get_polar_class_builder()
-            .add_class_method("superusers", User::superuser)
-            .build(),
-    )?;
+    oso.register_class(User::get_polar_class_builder().build())?;
+    oso.register_class(Folder::get_polar_class_builder().build())?;
+    oso.register_class(Document::get_polar_class_builder().build())?;
 
     oso.load_str(
-        r#"allow(actor: User, _action, _resource) if
-                        actor.username.ends_with("example.com");"#,
+        r#"
+        actor User {}
+
+        resource Folder {
+            permissions = [ "edit" ];
+            roles = [ "admin" ];
+            "edit" if "admin";
+        }
+
+        resource Document {
+            permissions = [ "edit" ];
+            roles = [ "admin" ];
+            "edit" if "admin";
+
+            relations = { parent: Folder };
+            "admin" if "admin" on "parent";
+        }
+
+        allow(actor: Actor, action: String, resource: Resource) if
+            has_permission(actor, action, resource);
+        has_relation(doc: Document, "parent", folder: Folder)
+            if folder == doc.folder;
+        has_role(actor: User, "admin", _resource: Document)
+            if actor.username == "doc_admin";
+        has_role(actor: User, "admin", _resource: Folder)
+            if actor.username == "folder_admin";
+    "#,
     )?;
 
-    let user1 = User {
-        username: "alice@example.com".to_owned(),
+    let doc_admin = User {
+        username: "doc_admin",
     };
-    let user2 = User {
-        username: "alice@xample.com".to_owned(),
+    let folder_admin = User {
+        username: "folder_admin",
     };
-    assert!(oso.is_allowed(user1, "foo", "bar")?);
-    assert!(!oso.is_allowed(user2, "foo", "bar")?);
+    let folder = Folder { name: "the_folder" };
+    let doc = Document { folder };
+    // Easy cases
+    assert!(oso.is_allowed(folder_admin, "edit", folder).unwrap());
+    assert!(!oso.is_allowed(doc_admin, "edit", folder).unwrap());
+    assert!(oso.is_allowed(doc_admin, "edit", doc).unwrap());
+    // Leverage the relationship
+    assert!(oso.is_allowed(folder_admin, "edit", doc).unwrap());
     Ok(())
 }
