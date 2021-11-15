@@ -54,11 +54,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         allow(actor: Actor, action: String, resource: Resource) if
             has_permission(actor, action, resource);
         has_relation(folder: Folder, "parent", doc: Document)
-            if folder == doc.folder;
+            if folder = doc.folder;
         has_role(actor: User, "admin", _resource: Document)
-            if actor.username == "doc_admin";
+            if actor.username = "doc_admin";
         has_role(actor: User, "admin", _resource: Folder)
-            if actor.username == "folder_admin";
+            if actor.username = "folder_admin";
     "#,
     )?;
 
@@ -75,8 +75,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(!oso.is_allowed(doc_admin, "edit", folder).unwrap());
     assert!(oso.is_allowed(doc_admin, "edit", doc).unwrap());
     // Leverage the relationship
-    let error = oso.is_allowed(folder_admin, "edit", doc).unwrap_err();
-    eprintln!("{:#}", error);
     assert!(oso.is_allowed(folder_admin, "edit", doc).unwrap());
     Ok(())
 }
